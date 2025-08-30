@@ -34,8 +34,31 @@ void workerThreadStart(WorkerArgs * const args) {
     // to compute a part of the output image.  For example, in a
     // program that uses two threads, thread 0 could compute the top
     // half of the image and thread 1 could compute the bottom half.
-
     printf("Hello world from thread %d\n", args->threadId);
+
+    int nThreads = 8;
+    // add + 1 to ignore float division truncation
+    int numRows = (args->height / nThreads);
+
+    std::thread threads[nThreads];
+
+    for (int i= 0; i < nThreads; ++i) {
+        int startRow = i * numRows;
+        threads[i] = std::thread(mandelbrotSerial, args->x0, args->y0, args->x1, args->y1, args->width,
+                        args->height, startRow, numRows, args->maxIterations, args->output);
+   }
+
+    // std::thread one(mandelbrotSerial, args->x0, args->y0, args->x1, args->y1, args->width, args->height, 0, halfOfTheRows, args->maxIterations, args->output);
+    // std::thread two(mandelbrotSerial, args->x0, args->y0, args->x1, args->y1, args->width, args->height, halfOfTheRows, halfOfTheRows, args->maxIterations, args->output);
+    // std::thread three(mandelbrotSerial, args->x0, args->y0, args->x1, args->y1, args->width, args->height, 0, halfOfTheRows, args->maxIterations, args->output);
+    // std::thread four(mandelbrotSerial, args->x0, args->y0, args->x1, args->y1, args->width, args->height, halfOfTheRows, halfOfTheRows, args->maxIterations, args->output);
+    // one.join();
+    // two.join();
+
+    for (int i = 0; i < nThreads; ++i) {
+        threads[i].join();
+    }
+    printf("Finished computing workerThread\n");
 }
 
 //

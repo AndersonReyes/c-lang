@@ -1,0 +1,4 @@
+/home/andersonreyes/Coding/c-lang/game-engine/out/CMakeFiles/gamelib.dir
+/home/andersonreyes/Coding/c-lang/game-engine/out/CMakeFiles/hello.dir
+/home/andersonreyes/Coding/c-lang/game-engine/out/CMakeFiles/edit_cache.dir
+/home/andersonreyes/Coding/c-lang/game-engine/out/CMakeFiles/rebuild_cache.dir
