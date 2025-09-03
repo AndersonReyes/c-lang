@@ -1,18 +1,10 @@
-// #include "hello.hpp"
-//
-//
-// int main() {
-//   print_hello();
-//   return 0;}
-
-#include <array>
 #include <vector>
 
 #include "SDL3/SDL_rect.h"
 #include "SDL3/SDL_render.h"
+#include "app.hpp"
 #include "glm/ext/vector_double2.hpp"
-#include "glm/gtc/constants.hpp"
-#include "glm/simd/platform.h"
+#include "util/results.hpp"
 #define SDL_MAIN_USE_CALLBACKS 1 /* use the callbacks instead of main() */
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
@@ -25,11 +17,12 @@ static Uint64 last_time = 0;
 #define WINDOW_WIDTH 640
 #define WINDOW_HEIGHT 480
 
-#define NUM_POINTS 500
+#define NUM_POINTS 50
 
 namespace engine {
 namespace particles {
 
+/// TODO: move to engline lib
 /// interface for a particle
 class Particle {
  public:
@@ -38,40 +31,52 @@ class Particle {
       : position(position),
         acceleration(acceleration),
         velocity(velocity),
-        lifespan(255) {}
+        lifespan(255),
+        forces{} {}
+
+  void addForce(glm::dvec2 force) { forces.push_back(force); }
 
   void Update(double delta) {
+    applyForce();
+
     position += delta * (acceleration + velocity);
 
-    if (position.x >= WINDOW_WIDTH) {
-      position.x = 0;
+    if (position.x >= WINDOW_WIDTH || position.x < 0) {
+      acceleration.x = 0;
+      acceleration.y = 0;
+      position.x = SDL_randf() * ((float)WINDOW_HEIGHT);
       position.y = SDL_randf() * ((float)WINDOW_HEIGHT);
     }
 
-    if (position.y >= WINDOW_HEIGHT) {
+    if (position.y >= WINDOW_HEIGHT || position.y <= 0) {
+      acceleration.x = 0;
+      acceleration.y = 0;
       position.x = SDL_randf() * ((float)WINDOW_WIDTH);
-      position.y = 0;
+      position.y = SDL_randf() * ((float)WINDOW_WIDTH);
     }
-
-    point.x = position.x;
-    point.y = position.y;
   }
 
   void Render(SDL_Renderer *renderer) {
     SDL_RenderPoint(renderer, position.x, position.y);
   }
 
-  SDL_FPoint GetPoint() { return point; }
-
  protected:
   glm::dvec2 position;
   glm::dvec2 acceleration;
   glm::dvec2 velocity;
-  SDL_FPoint point;
   int lifespan;
+  std::vector<glm::dvec2> forces;
+
+  void applyForce() {
+    // apply each force vector to the acceleration
+    for (const glm::dvec2 &f : forces) {
+      acceleration += f;
+    }
+  }
 };
 
 /// interface for a particle
+/// TODO: move to engine lib
 class ParticleSystem {
  public:
   ParticleSystem() : particles() {}
@@ -110,6 +115,47 @@ class ParticleSystem {
 
 static std::vector<engine::particles::Particle> particles{};
 static engine::particles::ParticleSystem particleSystem{};
+static glm::dvec2 gravity(0, 0.01);
+
+class ParticlesDemo {
+ public:
+  ParticlesDemo() {}
+
+  engine::core::Result<engine::core::Empty> init() {
+    /* set up the data for a bunch of points. */
+    for (int i = 0; i < NUM_POINTS; i++) {
+      float x = SDL_randf() * ((float)WINDOW_WIDTH);
+      float y = SDL_randf() * ((float)WINDOW_HEIGHT);
+      // particleSystem.PushBack(SDL_FPoint{x, y});
+      engine::particles::Particle p = engine::particles::Particle{
+          glm::dvec2(x, y), glm::dvec2(0, 0), glm::dvec2(0, -100), 255};
+
+      p.addForce(gravity);
+      particleSystem.PushBack(p);
+    }
+
+    return engine::core::success(engine::core::empty);
+  }
+
+  engine::core::Result<engine::core::Empty> update(double delta) {
+    /* let's move all our points a little for a new frame. */
+    particleSystem.Update(delta);
+
+    return engine::core::success(engine::core::empty);
+  }
+
+  engine::core::Result<engine::core::Empty> shutdown() {
+    return engine::core::success(engine::core::empty);
+  }
+
+  // virtual
+  engine::core::Result<engine::core::Empty> render(SDL_Renderer *renderer) {
+    particleSystem.Render(renderer);
+    return engine::core::success(engine::core::empty);
+  }
+};
+
+static ParticlesDemo app{};
 
 /* This function runs once at startup. */
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
@@ -131,13 +177,9 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
     return SDL_APP_FAILURE;
   }
 
-  /* set up the data for a bunch of points. */
-  for (i = 0; i < NUM_POINTS; i++) {
-    float x = SDL_randf() * ((float)WINDOW_WIDTH);
-    float y = SDL_randf() * ((float)WINDOW_HEIGHT);
-    // particleSystem.PushBack(SDL_FPoint{x, y});
-    particleSystem.PushBack(engine::particles::Particle{
-        glm::dvec2(x, y), glm::dvec2(10, 1), glm::dvec2(0, 0), 255});
+  if (!app.init()) {
+    SDL_Log("failed to init app");
+    return SDL_APP_FAILURE;
   }
 
   last_time = SDL_GetTicks();
@@ -145,10 +187,12 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
   return SDL_APP_CONTINUE; /* carry on with the program! */
 }
 
-/* This function runs when a new event (mouse input, keypresses, etc) occurs. */
+/* This function runs when a new event (mouse input, keypresses, etc) occurs.
+ */
 SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
   if (event->type == SDL_EVENT_QUIT) {
-    return SDL_APP_SUCCESS; /* end the program, reporting success to the OS. */
+    return SDL_APP_SUCCESS; /* end the program, reporting success to the OS.
+                             */
   }
   return SDL_APP_CONTINUE; /* carry on with the program! */
 }
@@ -160,9 +204,10 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
       ((float)(now - last_time)) / 1000.0f; /* seconds since last iteration */
   int i;
 
-  /* let's move all our points a little for a new frame. */
-  particleSystem.Update(elapsed);
-
+  if (!app.update(elapsed)) {
+    SDL_Log("failed to update app");
+    return SDL_APP_FAILURE;
+  }
   last_time = now;
 
   /* as you can see from this, rendering draws over whatever was drawn before
@@ -172,12 +217,13 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
   SDL_RenderClear(renderer);                /* start with a blank canvas. */
   SDL_SetRenderDrawColor(renderer, 255, 255, 255,
                          SDL_ALPHA_OPAQUE); /* white, full alpha */
-  // SDL_RenderPoints(renderer, particleSystem.Data(),
-  //              particleSystem.NumParticles()); /* draw all the points! */
 
   /* You can also draw single points with SDL_RenderPoint(), but it's
      cheaper (sometimes significantly so) to do them all at once. */
-  particleSystem.Render(renderer);
+  if (!app.render(renderer)) {
+    SDL_Log("failed to render app");
+    return SDL_APP_FAILURE;
+  }
 
   SDL_RenderPresent(renderer); /* put it all on the screen! */
 
@@ -187,4 +233,7 @@ SDL_AppResult SDL_AppIterate(void *appstate) {
 /* This function runs once at shutdown. */
 void SDL_AppQuit(void *appstate, SDL_AppResult result) {
   /* SDL will clean up the window/renderer for us. */
+  if (!app.shutdown()) {
+    SDL_Log("failed to shutdown app");
+  }
 }

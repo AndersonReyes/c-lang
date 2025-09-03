@@ -19,7 +19,7 @@ add_subdirectory(vendor/glm EXCLUDE_FROM_ALL)
 # Engine Lib
 add_library(gamelib STATIC ${CORE_HEADER} ${CORE_SOURCE})
 target_include_directories(gamelib PUBLIC include)
-target_compile_features(gamelib PUBLIC cxx_std_17)
+target_compile_features(gamelib PUBLIC cxx_std_23)
 
 ## SDL Dep
 target_link_libraries(gamelib PRIVATE SDL3::SDL3)
@@ -33,3 +33,7 @@ target_include_directories(gamelib PUBLIC vendor/glm)
 # Apps
 add_executable(hello apps/hello_main.cpp)
 target_link_libraries(hello PUBLIC gamelib)
+
+## Particles
+add_executable(particles apps/particles.cpp)
+target_link_libraries(particles PUBLIC gamelib)
