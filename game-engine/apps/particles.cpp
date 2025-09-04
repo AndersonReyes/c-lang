@@ -1,7 +1,9 @@
 #include <vector>
 
+#include "SDL3/SDL_log.h"
 #include "SDL3/SDL_rect.h"
 #include "SDL3/SDL_render.h"
+#include "SDL3/SDL_stdinc.h"
 #include "app.hpp"
 #include "glm/ext/vector_double2.hpp"
 #include "util/results.hpp"
@@ -9,111 +11,43 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
 
-/* We will use this renderer to draw into this window every frame. */
-static SDL_Window *window = NULL;
-static SDL_Renderer *renderer = NULL;
-static Uint64 last_time = 0;
+#include "particle.hpp"
+#include "particle_system.hpp"
 
 #define WINDOW_WIDTH 640
 #define WINDOW_HEIGHT 480
 
 #define NUM_POINTS 50
 
-namespace engine {
-namespace particles {
+/* We will use this renderer to draw into this window every frame. */
+static SDL_Window *window = NULL;
+static SDL_Renderer *renderer = NULL;
+static Uint64 last_time = 0;
+static glm::dvec2 particleStart{WINDOW_WIDTH / 2, 50};
+static float lifespanLimit{25.0};
 
-/// TODO: move to engline lib
-/// interface for a particle
-class Particle {
+class RespawningParticle : public engine::particles::Particle {
  public:
-  Particle(glm::dvec2 position, glm::dvec2 acceleration, glm::dvec2 velocity,
-           int lifespan)
-      : position(position),
-        acceleration(acceleration),
-        velocity(velocity),
-        lifespan(255),
-        forces{} {}
+  RespawningParticle()
+      : engine::particles::Particle::Particle(
+            particleStart, glm::dvec2(0, 0),
+            glm::dvec2(SDL_randf() * 200, SDL_randf() * 100), lifespanLimit) {}
 
-  void addForce(glm::dvec2 force) { forces.push_back(force); }
+  void Update(double delta) override {
+    lifespan = lifespanLimit;
+    engine::particles::Particle::Update(delta);
 
-  void Update(double delta) {
-    applyForce();
-
-    position += delta * (acceleration + velocity);
-
-    if (position.x >= WINDOW_WIDTH || position.x < 0) {
-      acceleration.x = 0;
-      acceleration.y = 0;
-      position.x = SDL_randf() * ((float)WINDOW_HEIGHT);
-      position.y = SDL_randf() * ((float)WINDOW_HEIGHT);
-    }
-
-    if (position.y >= WINDOW_HEIGHT || position.y <= 0) {
-      acceleration.x = 0;
-      acceleration.y = 0;
-      position.x = SDL_randf() * ((float)WINDOW_WIDTH);
-      position.y = SDL_randf() * ((float)WINDOW_WIDTH);
-    }
-  }
-
-  void Render(SDL_Renderer *renderer) {
-    SDL_RenderPoint(renderer, position.x, position.y);
-  }
-
- protected:
-  glm::dvec2 position;
-  glm::dvec2 acceleration;
-  glm::dvec2 velocity;
-  int lifespan;
-  std::vector<glm::dvec2> forces;
-
-  void applyForce() {
-    // apply each force vector to the acceleration
-    for (const glm::dvec2 &f : forces) {
-      acceleration += f;
+    // restart the particle
+    if (position.y >= WINDOW_HEIGHT || !IsAlive()) {
+      position.x = particleStart.x;
+      position.y = particleStart.y;
+      acceleration.x = 0.0;
+      acceleration.y = 0.0;
+      lifespan = lifespanLimit;
     }
   }
 };
 
-/// interface for a particle
-/// TODO: move to engine lib
-class ParticleSystem {
- public:
-  ParticleSystem() : particles() {}
-
-  // void PushBack(SDL_FPoint point) { particles.push_back(point); }
-  void PushBack(Particle particle) { particles.push_back(particle); }
-  void Update(double delta) {
-    // for (SDL_FPoint &point : particles) {
-    //   glm::dvec2 a = acceleration + initialVelocity;
-    //   point.x += a.x * delta;
-    //   point.y += a.y * delta;
-    // }
-    for (Particle &p : particles) {
-      p.Update(delta);
-    }
-  }
-
-  void Render(SDL_Renderer *renderer) {
-    for (Particle &p : particles) {
-      p.Render(renderer);
-    }
-  }
-
-  // SDL_FPoint *Data() { return particles.data(); }
-  // size_t NumParticles() { return particles.size(); }
-
- protected:
-  glm::dvec2 acceleration;
-  glm::dvec2 initialVelocity;
-  std::vector<Particle> particles;
-  int lifespan;
-};
-
-}  // namespace particles
-}  // namespace engine
-
-static std::vector<engine::particles::Particle> particles{};
 static engine::particles::ParticleSystem particleSystem{};
 static glm::dvec2 gravity(0, 0.01);
 
@@ -124,13 +58,9 @@ class ParticlesDemo {
   engine::core::Result<engine::core::Empty> init() {
     /* set up the data for a bunch of points. */
     for (int i = 0; i < NUM_POINTS; i++) {
-      float x = SDL_randf() * ((float)WINDOW_WIDTH);
-      float y = SDL_randf() * ((float)WINDOW_HEIGHT);
-      // particleSystem.PushBack(SDL_FPoint{x, y});
-      engine::particles::Particle p = engine::particles::Particle{
-          glm::dvec2(x, y), glm::dvec2(0, 0), glm::dvec2(0, -100), 255};
-
-      p.addForce(gravity);
+      // float x = SDL_randf() * ((float)WINDOW_WIDTH);
+      // float y = SDL_randf() * ((float)WINDOW_HEIGHT);
+      RespawningParticle *p = new RespawningParticle();
       particleSystem.PushBack(p);
     }
 
@@ -159,8 +89,6 @@ static ParticlesDemo app{};
 
 /* This function runs once at startup. */
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char *argv[]) {
-  particles.reserve(NUM_POINTS);
-
   int i;
 
   SDL_SetAppMetadata("Example Renderer Points", "1.0",
