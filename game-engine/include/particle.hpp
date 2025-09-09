@@ -16,6 +16,9 @@ class Particle {
   Particle(glm::dvec2 position, glm::dvec2 acceleration, glm::dvec2 velocity,
            int lifespan);
 
+  Particle(const Particle& other) = delete;
+  Particle(const Particle&& other);
+
   virtual void Update(double delta);
   virtual ~Particle() {}
 

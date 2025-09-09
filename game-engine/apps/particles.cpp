@@ -1,3 +1,4 @@
+#include <memory>
 #include <vector>
 
 #include "SDL3/SDL_log.h"
@@ -17,13 +18,13 @@
 #define WINDOW_WIDTH 640
 #define WINDOW_HEIGHT 480
 
-#define NUM_POINTS 50
+#define NUM_POINTS 500
 
 /* We will use this renderer to draw into this window every frame. */
 static SDL_Window *window = NULL;
 static SDL_Renderer *renderer = NULL;
 static Uint64 last_time = 0;
-static glm::dvec2 particleStart{WINDOW_WIDTH / 2, 50};
+static glm::dvec2 particleStart{50, 50};
 static float lifespanLimit{25.0};
 
 class RespawningParticle : public engine::particles::Particle {
@@ -60,8 +61,7 @@ class ParticlesDemo {
     for (int i = 0; i < NUM_POINTS; i++) {
       // float x = SDL_randf() * ((float)WINDOW_WIDTH);
       // float y = SDL_randf() * ((float)WINDOW_HEIGHT);
-      RespawningParticle *p = new RespawningParticle();
-      particleSystem.PushBack(p);
+      particleSystem.PushBack(std::make_unique<RespawningParticle>());
     }
 
     return engine::core::success(engine::core::empty);

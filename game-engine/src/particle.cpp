@@ -1,3 +1,6 @@
+#include <iostream>
+
+#include "SDL3/SDL_log.h"
 #include "particle.hpp"
 
 namespace engine {
@@ -10,6 +13,24 @@ Particle::Particle(glm::dvec2 position, glm::dvec2 acceleration,
       velocity(velocity),
       lifespan(lifespan),
       forces{} {}
+
+// Particle::Particle(const Particle& other)
+//     : position(other.position),
+//       acceleration(other.acceleration),
+//       velocity(other.velocity),
+//       lifespan(other.lifespan),
+//       forces(other.forces) {
+//   SDL_Log("Particle copied!\n");
+// }
+
+Particle::Particle(const Particle&& other)
+    : position(other.position),
+      acceleration(other.acceleration),
+      velocity(other.velocity),
+      lifespan(other.lifespan),
+      forces(other.forces) {
+  SDL_Log("Particle moved!\n");
+}
 
 void Particle::AddForce(glm::dvec2 force) { forces.push_back(force); }
 
@@ -24,7 +45,7 @@ bool Particle::IsAlive() const { return lifespan > 0; }
 
 void Particle::ApplyForces() {
   // apply each force vector to the acceleration
-  for (const glm::dvec2 &f : forces) {
+  for (const glm::dvec2& f : forces) {
     acceleration += f;
   }
 }
