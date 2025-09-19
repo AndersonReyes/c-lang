@@ -1,8 +1,8 @@
 #include <memory>
 #include <vector>
 
+#include "SDL3/SDL_events.h"
 #include "SDL3/SDL_log.h"
-#include "SDL3/SDL_rect.h"
 #include "SDL3/SDL_render.h"
 #include "SDL3/SDL_stdinc.h"
 #include "app.hpp"
@@ -26,12 +26,13 @@ static SDL_Renderer *renderer = NULL;
 static Uint64 last_time = 0;
 static glm::dvec2 particleStart{50, 50};
 static float lifespanLimit{25.0};
+static int mouseX = 50, mouseY = 50;
 
 class RespawningParticle : public engine::particles::Particle {
  public:
   RespawningParticle()
       : engine::particles::Particle::Particle(
-            particleStart, glm::dvec2(0, 0),
+            glm::dvec2(mouseX, mouseY), glm::dvec2(0, 0),
             glm::dvec2(SDL_randf() * 200, SDL_randf() * 100), lifespanLimit) {}
 
   void Update(double delta) override {
@@ -40,8 +41,8 @@ class RespawningParticle : public engine::particles::Particle {
 
     // restart the particle
     if (position.y >= WINDOW_HEIGHT || !IsAlive()) {
-      position.x = particleStart.x;
-      position.y = particleStart.y;
+      position.x = mouseX;
+      position.y = mouseY;
       acceleration.x = 0.0;
       acceleration.y = 0.0;
       lifespan = lifespanLimit;
@@ -121,6 +122,9 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event) {
   if (event->type == SDL_EVENT_QUIT) {
     return SDL_APP_SUCCESS; /* end the program, reporting success to the OS.
                              */
+  } else if (event->type == SDL_EVENT_MOUSE_MOTION) {
+    mouseX = event->motion.x;
+    mouseY = event->motion.y;
   }
   return SDL_APP_CONTINUE; /* carry on with the program! */
 }
